@@ -41,7 +41,7 @@ from gym.envs.registration import register
 reg = register(
             id="AbbReach-v0",
             entry_point='irb120_env:AbbEnv',
-            max_episode_steps=10000,
+            max_episode_steps=50,
         )
 
 
@@ -408,9 +408,10 @@ class AbbEnv(gym.Env):
         state = self._get_obs()
 
         position = self.get_achieved_goal() # compute the reward before returning the info
-        print("Position:",position)
+        # print("Position:",position)
         # print("compute reward here:",self.compute_reward(self.achieved_goal,self.desired_goal))
         reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
+
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
         # info = {"is_success": done}
         # info = {"is_success": self.task.is_success(obs["achieved_goal"], self.task.get_goal())}
@@ -442,13 +443,14 @@ class AbbEnv(gym.Env):
         # state_msg.pose.position.x = x 
         # state_msg.pose.position.y = y
         # state_msg.pose.position.z = z
-        # 
+        
         # rospy.wait_for_service('/gazebo/set_model_state')
         # try:
         #     set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         #     resp = set_state(state_msg)
         # except rospy.ServiceException as e:
         #     print ("Service call failed: %s" , e)
+
         # goal = self.np_random.uniform(self.goal_range_low, self.goal_range_high)
         print("sample goal (xyz):",goal)
         return goal
@@ -464,6 +466,13 @@ class AbbEnv(gym.Env):
     #         return -np.array(d > self.distance_threshold, dtype=np.float64)
     #     else:
     #         return -d
+
+    def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
+        d = self.distance(achieved_goal, desired_goal)
+        if self.reward_type == "sparse":
+            return -np.array(d > self.distance_threshold, dtype=np.float64)
+        else:
+            return -d
 
     def distance(self,a: np.ndarray, b: np.ndarray) -> Union[float, np.ndarray]:
         """Compute the distance between two array. This function is vectorized.
@@ -493,6 +502,8 @@ class AbbEnv(gym.Env):
             done = True
         else:
             reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
+            if reward < -6:
+                done = True
             done = False
 
         return reward, done
