@@ -35,6 +35,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 # generate random number
 import random
 
+from visualization_msgs.msg import Marker
 
 from gym.envs.registration import register
 
@@ -144,6 +145,10 @@ class AbbEnv(gym.Env):
             )
         )
         # print(self.observation_space)
+
+
+        # Misc variables
+        self.box_name = "box"
 
         # Publish trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
@@ -368,6 +373,8 @@ class AbbEnv(gym.Env):
     # https://github.com/qgallouedec/panda-gym/blob/master/panda_gym/envs/tasks/reach.py
     def reset(self) -> Dict[str, np.ndarray]:
         self.desired_goal = self._sample_goal() 
+        # self.add_box(goal=self.desired_goal) # add box to rviz for visualization
+        self.add_marker(goal=self.desired_goal) # add box to rviz for visualization
         self.move_joint_arm(0,0,0,0,0,0) #g o back to neutral position
         self.wait_time_for_execute_movement()
         # return self.desired_goal
@@ -390,13 +397,20 @@ class AbbEnv(gym.Env):
         joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.01)
-
-        joint_goal[0] = action[0] * 2.87979 * 0.1
-        joint_goal[1] = action[1] * 1.91986 * 0.1
-        joint_goal[2] = action[2] * 1.91986 * 0.1
+        scale = 0.2
+        joint_goal[0] = action[0] * 2.87979 * scale
+        joint_goal[1] = action[1] * 1.91986 * scale
+        joint_goal[2] = action[2] * 1.91986 * scale
         # joint_goal[3] = action[3] * 2.79253 * 0.1
         # joint_goal[4] = action[4] * 2.09440 * 0.1
         # joint_goal[5] = action[5] * 6.98132 * 0.1
+
+        if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
+            done = True 
+        if joint_goal[1] > 0.96 or joint_goal[1] < -0.96: # if more/less than +-55 degree
+            done = True 
+        if joint_goal[2] > 0.96 or joint_goal[2] < -0.96: # if more/less than +-55 degree
+            done = True 
 
         self.arm_group.go(joint_goal, wait=True)
         self.arm_group.stop() # To guarantee no residual movement
@@ -410,9 +424,11 @@ class AbbEnv(gym.Env):
         position = self.get_achieved_goal() # compute the reward before returning the info
         # print("Position:",position)
         # print("compute reward here:",self.compute_reward(self.achieved_goal,self.desired_goal))
-        reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
 
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
+        reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
+
+
         # info = {"is_success": done}
         # info = {"is_success": self.task.is_success(obs["achieved_goal"], self.task.get_goal())}
         print("Reward:",reward," info:",info)
@@ -433,9 +449,9 @@ class AbbEnv(gym.Env):
 
     def _sample_goal(self) -> np.ndarray:
         """Randomize goal."""
-        x = random.uniform(0.2, 0.4)
+        x = random.uniform(0.3, 0.5)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.2, 0.4)
+        z = random.uniform(0.1, 0.5)
         goal = np.array([x,y,z])
 
         # state_msg = ModelState()
@@ -467,12 +483,12 @@ class AbbEnv(gym.Env):
     #     else:
     #         return -d
 
-    def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
-        d = self.distance(achieved_goal, desired_goal)
-        if self.reward_type == "sparse":
-            return -np.array(d > self.distance_threshold, dtype=np.float64)
-        else:
-            return -d
+    # def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
+    #     d = self.distance(achieved_goal, desired_goal)
+    #     if self.reward_type == "sparse":
+    #         return -np.array(d > self.distance_threshold, dtype=np.float64)
+    #     else:
+    #         return -d
 
     def distance(self,a: np.ndarray, b: np.ndarray) -> Union[float, np.ndarray]:
         """Compute the distance between two array. This function is vectorized.
@@ -496,15 +512,139 @@ class AbbEnv(gym.Env):
             [np.float32]: Dense Reward
         """
         scale = 10
-
-        if np.array_equal(desired_goal, achieved_goal):
+        reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
+        if reward > -0.9 and reward < 0:
             reward = 1 * scale
             done = True
         else:
-            reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
             if reward < -6:
                 done = True
+            elif reward > -3 and reward < -2:
+                reward += 1
+            elif reward > -2 and reward < -1:
+                reward += 2
+            elif reward > -1 and reward < 0.9:
+                reward += 3
             done = False
 
         return reward, done
 
+
+    def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
+        scale = 10
+        reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
+        if reward > -0.9 and reward < 0:
+            reward = 1 * scale
+            done = True
+        else:
+            if reward < -6:
+                done = True
+            elif reward > -3 and reward < -2:
+                reward += 1
+            elif reward > -2 and reward < -1:
+                reward += 2
+            elif reward > -1 and reward < 0.9:
+                reward += 3
+            done = False
+
+        return reward
+
+    def wait_for_state_update(
+        self, box_is_known=False, box_is_attached=False, timeout=4
+    ):
+
+        ## Ensuring Collision Updates Are Received
+        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ## If the Python node dies before publishing a collision object update message, the message
+        ## could get lost and the box will not appear. To ensure that the updates are
+        ## made, we wait until we see the changes reflected in the
+        ## ``get_attached_objects()`` and ``get_known_object_names()`` lists.
+        ## For the purpose of this tutorial, we call this function after adding,
+        ## removing, attaching or detaching an object in the planning scene. We then wait
+        ## until the updates have been made or ``timeout`` seconds have passed
+        start = rospy.get_time()
+        seconds = rospy.get_time()
+        while (seconds - start < timeout) and not rospy.is_shutdown():
+            # Test if the box is in attached objects
+            attached_objects = self.scene.get_attached_objects([self.box_name])
+            is_attached = len(attached_objects.keys()) > 0
+
+            # Test if the box is in the scene.
+            # Note that attaching the box will remove it from known_objects
+            is_known = self.box_name in self.scene.get_known_object_names()
+
+            # Test if we are in the expected state
+            if (box_is_attached == is_attached) and (box_is_known == is_known):
+                return True
+
+            # Sleep so that we give other threads time on the processor
+            rospy.sleep(0.1)
+            seconds = rospy.get_time()
+
+        # If we exited the while loop without returning then we timed out
+        return False
+
+
+    def add_box(self, timeout=4,goal=[]):
+
+        box_pose = geometry_msgs.msg.PoseStamped()
+        box_pose.header.frame_id = "base_link"
+        box_pose.pose.orientation.w = 1.0
+        box_pose.pose.position.x = goal[0]
+        box_pose.pose.position.y = goal[1]
+        box_pose.pose.position.z = goal[2]
+        self.box_name = "box"
+        self.scene.add_box(self.box_name, box_pose, size=(0.01, 0.01, 0.01))
+        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+
+
+    def add_marker(self,goal=[]):
+        self.marker_object_publisher = rospy.Publisher('/marker_basic',Marker,queue_size=1)
+        self.rate = rospy.Rate(1)
+        self.marker_object = Marker()
+        self.marker_object.header.frame_id = "base_link"
+        self.marker_object.header.stamp = rospy.get_rostime()
+        self.marker_object.type = Marker.SPHERE
+        self.marker_object.action = Marker.ADD
+
+        my_point = geometry_msgs.msg.Point()
+        my_point.x = goal[0]
+        my_point.y = goal[1]
+        my_point.z = goal[2]
+
+        self.marker_object.pose.position = my_point
+
+        # self.marker_object.pose.position.x = goal[0]
+        # self.marker_object.pose.position.y = goal[1]
+        # self.marker_object.pose.position.z = goal[2]
+
+        self.marker_object.pose.orientation.x = 0.0
+        self.marker_object.pose.orientation.y = 0.0
+        self.marker_object.pose.orientation.z = 0.0
+        self.marker_object.pose.orientation.w = 1.0
+
+        self.marker_object.scale.x = 0.05
+        self.marker_object.scale.y = 0.05
+        self.marker_object.scale.z = 0.05
+
+        self.marker_object.color.r = 0.0
+        self.marker_object.color.g = 1.0
+        self.marker_object.color.b = 0.0
+        self.marker_object.color.a = 1.0
+
+        self.marker_object.lifetime = rospy.Duration(0)
+
+
+        # box_pose = geometry_msgs.msg.PoseStamped()
+        # box_pose.header.frame_id = "base_link"
+        # box_pose.pose.orientation.w = 1.0
+        # box_pose.pose.position.x = goal[0]
+        # box_pose.pose.position.y = goal[1]
+        # box_pose.pose.position.z = goal[2]
+        # self.box_name = "box"
+        # self.scene.add_box(self.box_name, box_pose, size=(0.075, 0.075, 0.075))
+
+        self.marker_object_publisher.publish(self.marker_object)
+
+        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
