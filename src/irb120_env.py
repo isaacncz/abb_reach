@@ -405,13 +405,16 @@ class AbbEnv(gym.Env):
         # joint_goal[4] = action[4] * 2.09440 * 0.1
         # joint_goal[5] = action[5] * 6.98132 * 0.1
 
+        
         if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
             done = True 
+            print("joint 1 limit exceeds")
         if joint_goal[1] > 0.96 or joint_goal[1] < -0.96: # if more/less than +-55 degree
             done = True 
+            print("joint 2 limit exceeds")
         if joint_goal[2] > 0.96 or joint_goal[2] < -0.96: # if more/less than +-55 degree
             done = True 
-
+            print("joint 3 limit exceeds")
         self.arm_group.go(joint_goal, wait=True)
         self.arm_group.stop() # To guarantee no residual movement
 
@@ -428,7 +431,8 @@ class AbbEnv(gym.Env):
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
         reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
 
-
+        if done:
+            print("Episode finished")
         # info = {"is_success": done}
         # info = {"is_success": self.task.is_success(obs["achieved_goal"], self.task.get_goal())}
         print("Reward:",reward," info:",info)
@@ -451,7 +455,7 @@ class AbbEnv(gym.Env):
         """Randomize goal."""
         x = random.uniform(0.3, 0.5)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.1, 0.5)
+        z = random.uniform(0.1, 0.35)
         goal = np.array([x,y,z])
 
         # state_msg = ModelState()
@@ -511,97 +515,50 @@ class AbbEnv(gym.Env):
         Returns:
             [np.float32]: Dense Reward
         """
-        scale = 10
+        done = False
+        scale = 1
         reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
-        if reward > -0.9 and reward < 0:
-            reward = 1 * scale
+        # reward = np.round(reward, 5)
+        if reward > -0.095 and reward < 0:
+            reward = 1
             done = True
-        else:
-            if reward < -6:
-                done = True
-            elif reward > -3 and reward < -2:
-                reward += 1
-            elif reward > -2 and reward < -1:
-                reward += 2
-            elif reward > -1 and reward < 0.9:
-                reward += 3
-            done = False
+        elif reward < -0.5:
+            reward = -1
+        # elif reward > -0.5 and reward < -0.3:
+        #     reward += 1
+        #     done = False
+        # elif reward > -0.3 and reward < -0.2:
+        #     reward += 2
+        #     done = False
+        # elif reward > -0.2 and reward < -0.1:
+        #     reward += 3
+        #     done = False
+        # elif reward > -0.1 and reward < 0.095:
+        #     reward += 4
+        #     done = False
 
         return reward, done
 
 
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
-        scale = 10
+        scale = 1
         reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
-        if reward > -0.9 and reward < 0:
-            reward = 1 * scale
-            done = True
-        else:
-            if reward < -6:
-                done = True
-            elif reward > -3 and reward < -2:
-                reward += 1
-            elif reward > -2 and reward < -1:
-                reward += 2
-            elif reward > -1 and reward < 0.9:
-                reward += 3
-            done = False
-
+        # reward = np.round(reward, 5)
+        if reward > -0.095 and reward < 0:
+            reward = 1
+        elif reward < -0.5:
+            reward = -1
+        # elif reward > -0.3 and reward < -0.2:
+        #     reward += 1
+        # elif reward > -0.2 and reward < -0.1:
+        #     reward += 2
+        # elif reward > -0.1 and reward < 0.095:
+        #     reward += 5
         return reward
-
-    def wait_for_state_update(
-        self, box_is_known=False, box_is_attached=False, timeout=4
-    ):
-
-        ## Ensuring Collision Updates Are Received
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## If the Python node dies before publishing a collision object update message, the message
-        ## could get lost and the box will not appear. To ensure that the updates are
-        ## made, we wait until we see the changes reflected in the
-        ## ``get_attached_objects()`` and ``get_known_object_names()`` lists.
-        ## For the purpose of this tutorial, we call this function after adding,
-        ## removing, attaching or detaching an object in the planning scene. We then wait
-        ## until the updates have been made or ``timeout`` seconds have passed
-        start = rospy.get_time()
-        seconds = rospy.get_time()
-        while (seconds - start < timeout) and not rospy.is_shutdown():
-            # Test if the box is in attached objects
-            attached_objects = self.scene.get_attached_objects([self.box_name])
-            is_attached = len(attached_objects.keys()) > 0
-
-            # Test if the box is in the scene.
-            # Note that attaching the box will remove it from known_objects
-            is_known = self.box_name in self.scene.get_known_object_names()
-
-            # Test if we are in the expected state
-            if (box_is_attached == is_attached) and (box_is_known == is_known):
-                return True
-
-            # Sleep so that we give other threads time on the processor
-            rospy.sleep(0.1)
-            seconds = rospy.get_time()
-
-        # If we exited the while loop without returning then we timed out
-        return False
-
-
-    def add_box(self, timeout=4,goal=[]):
-
-        box_pose = geometry_msgs.msg.PoseStamped()
-        box_pose.header.frame_id = "base_link"
-        box_pose.pose.orientation.w = 1.0
-        box_pose.pose.position.x = goal[0]
-        box_pose.pose.position.y = goal[1]
-        box_pose.pose.position.z = goal[2]
-        self.box_name = "box"
-        self.scene.add_box(self.box_name, box_pose, size=(0.01, 0.01, 0.01))
-        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
-
-
 
     def add_marker(self,goal=[]):
         self.marker_object_publisher = rospy.Publisher('/marker_basic',Marker,queue_size=1)
-        self.rate = rospy.Rate(1)
+        self.rate = rospy.Rate(120)
         self.marker_object = Marker()
         self.marker_object.header.frame_id = "base_link"
         self.marker_object.header.stamp = rospy.get_rostime()
@@ -614,10 +571,6 @@ class AbbEnv(gym.Env):
         my_point.z = goal[2]
 
         self.marker_object.pose.position = my_point
-
-        # self.marker_object.pose.position.x = goal[0]
-        # self.marker_object.pose.position.y = goal[1]
-        # self.marker_object.pose.position.z = goal[2]
 
         self.marker_object.pose.orientation.x = 0.0
         self.marker_object.pose.orientation.y = 0.0
@@ -635,16 +588,54 @@ class AbbEnv(gym.Env):
 
         self.marker_object.lifetime = rospy.Duration(0)
 
-
-        # box_pose = geometry_msgs.msg.PoseStamped()
-        # box_pose.header.frame_id = "base_link"
-        # box_pose.pose.orientation.w = 1.0
-        # box_pose.pose.position.x = goal[0]
-        # box_pose.pose.position.y = goal[1]
-        # box_pose.pose.position.z = goal[2]
-        # self.box_name = "box"
-        # self.scene.add_box(self.box_name, box_pose, size=(0.075, 0.075, 0.075))
-
         self.marker_object_publisher.publish(self.marker_object)
 
-        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    # def wait_for_state_update(
+    #     self, box_is_known=False, box_is_attached=False, timeout=4
+    # ):
+
+    #     ## Ensuring Collision Updates Are Received
+    #     ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    #     ## If the Python node dies before publishing a collision object update message, the message
+    #     ## could get lost and the box will not appear. To ensure that the updates are
+    #     ## made, we wait until we see the changes reflected in the
+    #     ## ``get_attached_objects()`` and ``get_known_object_names()`` lists.
+    #     ## For the purpose of this tutorial, we call this function after adding,
+    #     ## removing, attaching or detaching an object in the planning scene. We then wait
+    #     ## until the updates have been made or ``timeout`` seconds have passed
+    #     start = rospy.get_time()
+    #     seconds = rospy.get_time()
+    #     while (seconds - start < timeout) and not rospy.is_shutdown():
+    #         # Test if the box is in attached objects
+    #         attached_objects = self.scene.get_attached_objects([self.box_name])
+    #         is_attached = len(attached_objects.keys()) > 0
+
+    #         # Test if the box is in the scene.
+    #         # Note that attaching the box will remove it from known_objects
+    #         is_known = self.box_name in self.scene.get_known_object_names()
+
+    #         # Test if we are in the expected state
+    #         if (box_is_attached == is_attached) and (box_is_known == is_known):
+    #             return True
+
+    #         # Sleep so that we give other threads time on the processor
+    #         rospy.sleep(0.1)
+    #         seconds = rospy.get_time()
+
+    #     # If we exited the while loop without returning then we timed out
+    #     return False
+
+
+    # def add_box(self, timeout=4,goal=[]):
+
+    #     box_pose = geometry_msgs.msg.PoseStamped()
+    #     box_pose.header.frame_id = "base_link"
+    #     box_pose.pose.orientation.w = 1.0
+    #     box_pose.pose.position.x = goal[0]
+    #     box_pose.pose.position.y = goal[1]
+    #     box_pose.pose.position.z = goal[2]
+    #     self.box_name = "box"
+    #     self.scene.add_box(self.box_name, box_pose, size=(0.01, 0.01, 0.01))
+    #     return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
