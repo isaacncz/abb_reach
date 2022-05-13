@@ -455,7 +455,7 @@ class AbbEnv(gym.Env):
         """Randomize goal."""
         x = random.uniform(0.3, 0.5)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.1, 0.35)
+        z = random.uniform(0.1, 0.15)
         goal = np.array([x,y,z])
 
         # state_msg = ModelState()
@@ -516,14 +516,16 @@ class AbbEnv(gym.Env):
             [np.float32]: Dense Reward
         """
         done = False
-        scale = 1
-        reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
-        # reward = np.round(reward, 5)
+
+        reward = np.linalg.norm(desired_goal - achieved_goal) 
+        reward = np.power(reward,(2/5))
+        reward = -reward
+
         if reward > -0.095 and reward < 0:
             reward = 1
             done = True
-        elif reward < -0.5:
-            reward = -1
+        # elif reward < -0.5:
+        #     reward = -1
         # elif reward > -0.5 and reward < -0.3:
         #     reward += 1
         #     done = False
@@ -541,13 +543,15 @@ class AbbEnv(gym.Env):
 
 
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
-        scale = 1
-        reward = -np.linalg.norm(desired_goal - achieved_goal) * scale
-        # reward = np.round(reward, 5)
+
+        reward = np.linalg.norm(desired_goal - achieved_goal)
+        reward = np.power(reward,(2/5))
+        reward = -reward
+
         if reward > -0.095 and reward < 0:
             reward = 1
-        elif reward < -0.5:
-            reward = -1
+        # elif reward < -0.5:
+        #     reward = -1
         # elif reward > -0.3 and reward < -0.2:
         #     reward += 1
         # elif reward > -0.2 and reward < -0.1:
