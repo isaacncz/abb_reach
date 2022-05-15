@@ -171,45 +171,30 @@ class AbbEnv(gym.Env):
         rqst.robot_state.joint_state.name = []
         rqst.robot_state.joint_state.position = []
         i = 1
-        
-        while (i<7):
-            rqst.robot_state.joint_state.name.append('joint_'+str(i))
-            rqst.robot_state.joint_state.position.append(self.arm_group.get_current_joint_values()[i-1])
-            i+=1
-        res = moveit_fk(rqst)
-        # print(res.pose_stamped[0].pose.position)
-        position = [0, 0, 0]
-        position[0] = res.pose_stamped[0].pose.position.x
-        position[1] = res.pose_stamped[0].pose.position.y
-        position[2] = res.pose_stamped[0].pose.position.z
-        position = np.array(position)
-        self.achieved_goal = position
-        # print('self.achieved_goal',self.achieved_goal)
-        return position
-        # rospy.logdebug("computed fk:", res)
+        lastPosition = [0, 0, 0]
+        joint_goal = self.arm_group.get_current_joint_values()
+        while not (len(joint_goal) == 6):
+            print("wait robot joint")
+            joint_goal = self.arm_group.get_current_joint_values()
 
-
-    # def go_to_pose_goal(self, x,y,z):
-    #     self.arm_group.set_goal_tolerance(0.05)
-    #     pose_goal = geometry_msgs.msg.Pose()
-    #     pose_goal.orientation.w = 1.000000
-
-    #     # pose_goal.orientation.w = 0.519859
-    #     pose_goal.position.x = x
-    #     pose_goal.position.y = y
-    #     pose_goal.position.z = z
-
-    #     self.arm_group.set_pose_target(pose_goal)
-
-    #     ## Now, we call the planner to compute the plan and execute it.
-    #     plan = self.arm_group.go(wait=True)
-    #     # Calling `stop()` ensures that there is no residual movement
-    #     self.arm_group.stop()
-    #     # It is always good to clear your targets after planning with poses.
-    #     # Note: there is no equivalent function for clear_joint_value_targets()
-    #     self.arm_group.clear_pose_targets()
-    #     current_pose = self.arm_group.get_current_pose().pose
-    #     return all_close(pose_goal, current_pose, 0.05)
+        if (len(joint_goal) == 6):
+            while (i<7):
+                rqst.robot_state.joint_state.name.append('joint_'+str(i))
+                rqst.robot_state.joint_state.position.append(joint_goal[i-1])
+                i+=1
+            res = moveit_fk(rqst)
+            # print(res.pose_stamped[0].pose.position)
+            position = [0, 0, 0]
+            
+            position[0] = res.pose_stamped[0].pose.position.x
+            position[1] = res.pose_stamped[0].pose.position.y
+            position[2] = res.pose_stamped[0].pose.position.z
+            position = np.array(position)
+            lastPosition = position
+            self.achieved_goal = position
+            # print('self.achieved_goal',self.achieved_goal)
+            return position
+        return lastPosition
 
     def plan_cartesian_path(self,x,y,z):
 
@@ -241,7 +226,7 @@ class AbbEnv(gym.Env):
 
 
     def sample_action_by_joint_values(self):
-        joint_goal = self.arm_group.get_current_joint_values()
+        joint_goal = self.arm_group.get_current_joint_values()        
         self.arm_group.set_goal_joint_tolerance(0.05)
         joint_goal[0] = random.uniform(-0.15, 0.15)
         joint_goal[1] = random.uniform(-0.15, 0.15)
@@ -392,9 +377,13 @@ class AbbEnv(gym.Env):
 
 
     def step(self, action) -> Tuple[np.array, float, bool, dict]:
+        action = action.copy()
         if type(action) == list: action = np.array(action)
-
+     
         joint_goal = self.arm_group.get_current_joint_values()
+        while not (len(joint_goal) == 6):
+            print("wait robot joint")
+            joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.01)
         scale = 0.2
@@ -405,16 +394,6 @@ class AbbEnv(gym.Env):
         # joint_goal[4] = action[4] * 2.09440 * 0.1
         # joint_goal[5] = action[5] * 6.98132 * 0.1
 
-        
-        if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
-            done = True 
-            print("joint 1 limit exceeds")
-        if joint_goal[1] > 0.96 or joint_goal[1] < -0.96: # if more/less than +-55 degree
-            done = True 
-            print("joint 2 limit exceeds")
-        if joint_goal[2] > 0.96 or joint_goal[2] < -0.96: # if more/less than +-55 degree
-            done = True 
-            print("joint 3 limit exceeds")
         self.arm_group.go(joint_goal, wait=True)
         self.arm_group.stop() # To guarantee no residual movement
 
@@ -431,6 +410,19 @@ class AbbEnv(gym.Env):
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
         reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
 
+        if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
+            done = True 
+            reward = -100
+            print("joint 1 limit exceeds")
+        if joint_goal[1] > 0.96 or joint_goal[1] < -0.96: # if more/less than +-55 degree
+            done = True 
+            reward = -100
+            print("joint 2 limit exceeds")
+        if joint_goal[2] > 0.96 or joint_goal[2] < -0.96: # if more/less than +-55 degree
+            done = True 
+            reward = -100
+            print("joint 3 limit exceeds")
+
         if done:
             print("Episode finished")
         # info = {"is_success": done}
@@ -441,58 +433,20 @@ class AbbEnv(gym.Env):
         # if self.rs_state_to_info: info['rs_state'] = self.rs_state
         return state, reward, done, info
 
-    # def reward(self, rs_state, action) -> Tuple[float, bool, dict]:
-    #     done = False
-    #     info = {}
-
-    #     if self.elapsed_steps >= self.max_episode_steps:
-    #         done = True
-    #         info['final_status'] = 'max_steps_exceeded'
-            
-    #     return 0, done, info
-
     def _sample_goal(self) -> np.ndarray:
         """Randomize goal."""
         x = random.uniform(0.3, 0.5)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.1, 0.15)
+        z = random.uniform(0.1, 0.3)
         goal = np.array([x,y,z])
 
-        # state_msg = ModelState()
-        # state_msg.model_name = 'sphere50_no_collision'
-        # state_msg.pose.position.x = x 
-        # state_msg.pose.position.y = y
-        # state_msg.pose.position.z = z
-        
-        # rospy.wait_for_service('/gazebo/set_model_state')
-        # try:
-        #     set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
-        #     resp = set_state(state_msg)
-        # except rospy.ServiceException as e:
-        #     print ("Service call failed: %s" , e)
-
-        # goal = self.np_random.uniform(self.goal_range_low, self.goal_range_high)
         print("sample goal (xyz):",goal)
         return goal
 
     def is_success(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> Union[np.ndarray, float]:
         d = self.distance(achieved_goal, desired_goal)
-        return 1-d 
-        # return np.array(d < self.distance_threshold, dtype=np.float64)
-
-    # def compute_reward(self, achieved_goal, desired_goal) -> Union[np.ndarray, float]:
-    #     d = self.distance(achieved_goal, desired_goal)
-    #     if self.reward_type == "sparse":
-    #         return -np.array(d > self.distance_threshold, dtype=np.float64)
-    #     else:
-    #         return -d
-
-    # def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
-    #     d = self.distance(achieved_goal, desired_goal)
-    #     if self.reward_type == "sparse":
-    #         return -np.array(d > self.distance_threshold, dtype=np.float64)
-    #     else:
-    #         return -d
+        # return 1-d 
+        return np.array(d < self.distance_threshold, dtype=np.float64)
 
     def distance(self,a: np.ndarray, b: np.ndarray) -> Union[float, np.ndarray]:
         """Compute the distance between two array. This function is vectorized.
@@ -516,16 +470,14 @@ class AbbEnv(gym.Env):
             [np.float32]: Dense Reward
         """
         done = False
+        reward = -np.linalg.norm(desired_goal - achieved_goal) 
 
-        reward = np.linalg.norm(desired_goal - achieved_goal) 
-        reward = np.power(reward,(2/5))
-        reward = -reward
-
-        if reward > -0.095 and reward < 0:
+        if reward > -0.05 and reward < 0:
             reward = 1
-            done = True
-        # elif reward < -0.5:
-        #     reward = -1
+            # done = True
+        elif reward < -0.8:
+            reward = -1
+            # done = True
         # elif reward > -0.5 and reward < -0.3:
         #     reward += 1
         #     done = False
@@ -544,14 +496,12 @@ class AbbEnv(gym.Env):
 
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
 
-        reward = np.linalg.norm(desired_goal - achieved_goal)
-        reward = np.power(reward,(2/5))
-        reward = -reward
+        reward = -np.linalg.norm(desired_goal - achieved_goal) 
 
-        if reward > -0.095 and reward < 0:
+        if reward > -0.05 and reward < 0:
             reward = 1
-        # elif reward < -0.5:
-        #     reward = -1
+        elif reward < -0.8:
+            reward = -1
         # elif reward > -0.3 and reward < -0.2:
         #     reward += 1
         # elif reward > -0.2 and reward < -0.1:
