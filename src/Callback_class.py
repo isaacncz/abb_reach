@@ -50,7 +50,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                 print(f"Num timesteps: {self.num_timesteps}")
                 print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
                 # message = "Num timesteps: {self.num_timesteps} Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}"
-                message = "Timesteps: " + str(self.num_timesteps) + ' Best mean: ' + str(self.best_mean_reward) + ' Last mean:' + str(mean_reward)
+                message = "Timesteps: " + str(self.num_timesteps) + '\n Best mean: ' + str(self.best_mean_reward) + '\n Last mean:' + str(mean_reward)
                 bot.send_message(text=message, chat_id=chat_id)
               # New best model, you could save the agent here
               if mean_reward > self.best_mean_reward:

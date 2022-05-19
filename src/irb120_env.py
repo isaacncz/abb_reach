@@ -228,7 +228,7 @@ class AbbEnv(gym.Env):
 
     def sample_action_by_joint_values(self):
         joint_goal = self.arm_group.get_current_joint_values()        
-        self.arm_group.set_goal_joint_tolerance(0.05)
+        self.arm_group.set_goal_joint_tolerance(0.001)
         joint_goal[0] = random.uniform(-0.15, 0.15)
         joint_goal[1] = random.uniform(-0.15, 0.15)
         joint_goal[2] = random.uniform(-0.15, 0.15)
@@ -240,7 +240,7 @@ class AbbEnv(gym.Env):
     # Forward Kinematics (FK): move the arm by axis values
     def move_joint_arm(self,joint_0,joint_1,joint_2,joint_3,joint_4,joint_5):
         joint_goal = self.arm_group.get_current_joint_values()
-        self.arm_group.set_goal_joint_tolerance(0.01)
+        self.arm_group.set_goal_joint_tolerance(0.001)
         # print("joint goal:",joint_goal)
         convertToNumpy = np.array(joint_goal)
         # print("joint numpy:",convertToNumpy)
@@ -481,7 +481,7 @@ class AbbEnv(gym.Env):
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
         
         if reward > -0.05 and reward < 0:
-            reward = 1
+            reward = 0
             # done = True
         elif reward < -0.8:
             reward = -1
