@@ -17,6 +17,7 @@ from moveit_commander.conversions import pose_to_list
 from sensor_msgs.msg import JointState
 
 from math import pi
+import math
 import os
 from gym import spaces
 import gym
@@ -280,7 +281,8 @@ class AbbEnv(gym.Env):
         # return currentPoseArray.copy()
 
         return {
-            "observation": currentPoseArray.copy(),
+            # "observation": currentPoseArray.copy(),
+            "observation": self.get_achieved_goal(),
             "achieved_goal": self.get_achieved_goal(),
             "desired_goal": self.desired_goal
         }
@@ -385,11 +387,17 @@ class AbbEnv(gym.Env):
             print("wait robot joint")
             joint_goal = self.arm_group.get_current_joint_values()
 
-        self.arm_group.set_goal_joint_tolerance(0.01)
+        self.arm_group.set_goal_joint_tolerance(0.001)
         scale = 0.2
-        joint_goal[0] = action[0] * 2.87979 * scale
-        joint_goal[1] = action[1] * 1.91986 * scale
-        joint_goal[2] = action[2] * 1.91986 * scale
+        joint_goal[0] = action[0] * math.radians(165) * scale
+        joint_goal[1] = action[1] * math.radians(110) * scale
+        joint_goal[2] = action[2] * math.radians(110) * scale
+        # joint_goal[0] = action[0] * 2.87979 * scale
+        # joint_goal[1] = action[1] * 1.91986 * scale
+        # joint_goal[2] = action[2] * 1.91986 * scale
+        joint_goal[3] = 0
+        joint_goal[4] = 0
+        joint_goal[5] = 0
         # joint_goal[3] = action[3] * 2.79253 * 0.1
         # joint_goal[4] = action[4] * 2.09440 * 0.1
         # joint_goal[5] = action[5] * 6.98132 * 0.1
@@ -414,11 +422,11 @@ class AbbEnv(gym.Env):
             done = True 
             reward = -100
             print("joint 1 limit exceeds")
-        if joint_goal[1] > 0.96 or joint_goal[1] < -0.96: # if more/less than +-55 degree
+        if joint_goal[1] > 1.047 or joint_goal[1] < -1.047: # if more/less than +-60 degree
             done = True 
             reward = -100
             print("joint 2 limit exceeds")
-        if joint_goal[2] > 0.96 or joint_goal[2] < -0.96: # if more/less than +-55 degree
+        if joint_goal[2] > 1.047 or joint_goal[2] < -1.047: # if more/less than +-60 degree
             done = True 
             reward = -100
             print("joint 3 limit exceeds")
@@ -435,9 +443,9 @@ class AbbEnv(gym.Env):
 
     def _sample_goal(self) -> np.ndarray:
         """Randomize goal."""
-        x = random.uniform(0.3, 0.5)
+        x = random.uniform(0.3, 0.45)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.1, 0.3)
+        z = random.uniform(0.2, 0.35)
         goal = np.array([x,y,z])
 
         print("sample goal (xyz):",goal)
@@ -471,25 +479,23 @@ class AbbEnv(gym.Env):
         """
         done = False
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
-
+        
         if reward > -0.05 and reward < 0:
             reward = 1
             # done = True
         elif reward < -0.8:
             reward = -1
             # done = True
-        # elif reward > -0.5 and reward < -0.3:
-        #     reward += 1
-        #     done = False
-        # elif reward > -0.3 and reward < -0.2:
-        #     reward += 2
-        #     done = False
-        # elif reward > -0.2 and reward < -0.1:
-        #     reward += 3
-        #     done = False
-        # elif reward > -0.1 and reward < 0.095:
-        #     reward += 4
-        #     done = False
+
+        # done = False
+        # reward = np.linalg.norm(desired_goal - achieved_goal) 
+        # reward = -np.power(d,0.7)
+
+        # d = -d
+        # if d >= -0.05 and d < 0:
+        #     reward = 1
+        # elif d < -0.8:
+        #     reward = -1
 
         return reward, done
 
@@ -502,12 +508,15 @@ class AbbEnv(gym.Env):
             reward = 1
         elif reward < -0.8:
             reward = -1
-        # elif reward > -0.3 and reward < -0.2:
-        #     reward += 1
-        # elif reward > -0.2 and reward < -0.1:
-        #     reward += 2
-        # elif reward > -0.1 and reward < 0.095:
-        #     reward += 5
+        # d = np.linalg.norm(desired_goal - achieved_goal) 
+        # reward = -np.power(d,0.7)
+
+        # d = -d
+        # if d >= -0.05 and d < 0:
+        #     reward = 1
+        # elif d < -0.8:
+        #     reward = -1
+
         return reward
 
     def add_marker(self,goal=[]):
