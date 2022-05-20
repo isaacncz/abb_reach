@@ -1,8 +1,5 @@
 import numpy as np
 import rospy
-# from gazebo_msgs.srv import GetWorldProperties, GetModelState
-# from sensor_msgs.msg import JointState
-# from openai_ros import robot_gazebo_env
 import sys
 import moveit_commander
 import moveit_msgs.msg
@@ -12,8 +9,6 @@ import geometry_msgs.msg
 import copy
 from std_msgs.msg import Header
 from moveit_commander.conversions import pose_to_list
-# import trajectory_msgs.msg
-# from openai_ros.openai_ros_common import ROSLauncher
 from sensor_msgs.msg import JointState
 
 from math import pi
@@ -21,17 +16,11 @@ import math
 import os
 from gym import spaces
 import gym
-# from gym import error
-# from tf.transformations import euler_from_quaternion, quaternion_from_euler
+
 # moveit reference
 # http://docs.ros.org/en/jade/api/moveit_commander/html/classmoveit__commander_1_1move__group_1_1MoveGroupCommander.html#a6a4440597144e033cd1749e0e00716ca
 
-# for sphere target
-# from gazebo_msgs.msg import ModelState 
-# from gazebo_msgs.srv import SetModelState
-
 # distance
-# from typing import Any, Dict, Union
 from typing import Any, Dict, Optional, Tuple, Union
 # generate random number
 import random
@@ -47,49 +36,6 @@ reg = register(
         )
 
 
-try:
-    from math import pi, tau, dist, fabs, cos
-except:  # For Python 2 compatibility
-    from math import pi, fabs, cos, sqrt
-
-    tau = 2.0 * pi
-
-    def dist(p, q):
-        return sqrt(sum((p_i - q_i) ** 2.0 for p_i, q_i in zip(p, q)))
-
-
-def all_close(goal, actual, tolerance):
-    """
-    Convenience method for testing if the values in two lists are within a tolerance of each other.
-    For Pose and PoseStamped inputs, the angle between the two quaternions is compared (the angle
-    between the identical orientations q and -q is calculated correctly).
-    @param: goal       A list of floats, a Pose or a PoseStamped
-    @param: actual     A list of floats, a Pose or a PoseStamped
-    @param: tolerance  A float
-    @returns: bool
-    """
-    if type(goal) is list:
-        for index in range(len(goal)):
-            if abs(actual[index] - goal[index]) > tolerance:
-                return False
-
-    elif type(goal) is geometry_msgs.msg.PoseStamped:
-        return all_close(goal.pose, actual.pose, tolerance)
-
-    elif type(goal) is geometry_msgs.msg.Pose:
-        x0, y0, z0, qx0, qy0, qz0, qw0 = pose_to_list(actual)
-        x1, y1, z1, qx1, qy1, qz1, qw1 = pose_to_list(goal)
-        # Euclidean distance
-        d = dist((x1, y1, z1), (x0, y0, z0))
-        # phi = angle between orientations
-        cos_phi_half = fabs(qx0 * qx1 + qy0 * qy1 + qz0 * qz1 + qw0 * qw1)
-        return d <= tolerance and cos_phi_half >= cos(tolerance / 2.0)
-
-    return True
-
-
-
-# class AbbEnv(robot_gazebo_env.RobotGazeboEnv):
 class AbbEnv(gym.Env):
     """Superclass for all Robot environments.
     """
@@ -116,13 +62,10 @@ class AbbEnv(gym.Env):
         rospy.logdebug("end var INIT...")
 
         # RL 
-        # goal_range=0.3
+
         self.distance_threshold = 0.05
         self.reward_type = "dense"
 
-        # self.goal_range_low = np.array([-goal_range / 2, -goal_range / 2, 0])
-        # self.goal_range_high = np.array([goal_range / 2, goal_range / 2, goal_range])
-        # print(self.goal_range_high )
         self.desired_goal = np.zeros(3)
         self.achieved_goal = np.zeros(3)
         self.action_space = spaces.Box(-1, 1, shape=(3,), dtype=np.float32)
@@ -158,7 +101,6 @@ class AbbEnv(gym.Env):
 
         super(AbbEnv, self).__init__()
 
-
     def get_achieved_goal(self) -> np.ndarray:
         rospy.wait_for_service('compute_fk')
         try:
@@ -175,7 +117,7 @@ class AbbEnv(gym.Env):
         lastPosition = [0, 0, 0]
         joint_goal = self.arm_group.get_current_joint_values()
         while not (len(joint_goal) == 6):
-            print("wait robot joint")
+            print("[WARN] Waiting for robot joint values")
             joint_goal = self.arm_group.get_current_joint_values()
 
         if (len(joint_goal) == 6):
@@ -198,7 +140,6 @@ class AbbEnv(gym.Env):
         return lastPosition
 
     def plan_cartesian_path(self,x,y,z):
-
         waypoints = []
         scale = 1
         wpose = self.arm_group.get_current_pose().pose
@@ -208,18 +149,11 @@ class AbbEnv(gym.Env):
 
         waypoints.append(copy.deepcopy(wpose))
 
-        # We want the Cartesian path to be interpolated at a resolution of 1 cm
-        # which is why we will specify 0.01 as the eef_step in Cartesian
-        # translation.  We will disable the jump threshold by setting it to 0.0,
-        # ignoring the check for infeasible jumps in joint space, which is sufficient
-        # for this tutorial.
         (plan, fraction) = self.arm_group.compute_cartesian_path(
             waypoints, 0.01, 0.0  # waypoints to follow  # eef_step
         )  # jump_threshold
         self.arm_group.execute(plan, wait=True)
     
-
-
     def get_joint_values(self):
         print("Get the current configuration",self.arm_group.get_current_joint_values())
         print("Get the current pose",self.arm_group.get_current_pose())
@@ -262,18 +196,18 @@ class AbbEnv(gym.Env):
         """
         current_pose = self.arm_group.get_current_pose().pose
         # print("current pose:",current_pose)
-        
+        achieved_goal = self.achieved_goal.copy()
+        desired_goal = self.desired_goal.copy()
+        d = self.distance(achieved_goal, desired_goal)
+
         arrayOfPose = [    
             current_pose.position.x ,
             current_pose.position.y ,
             current_pose.position.z ,
-            current_pose.orientation.x ,
-            current_pose.orientation.y ,       
-            current_pose.orientation.z ,
-            current_pose.orientation.w ,
+            d
         ]
         currentPoseArray = np.array(arrayOfPose)
-        # print("current pose:",currentPoseArray) #to normalize this value
+        # print("current pose:",currentPoseArray) # to normalize this value
 
         # joint_angles = self.arm_group.get_joint_value_target() # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # print("joint_angles: ",joint_angles)
@@ -281,8 +215,8 @@ class AbbEnv(gym.Env):
         # return currentPoseArray.copy()
 
         return {
-            # "observation": currentPoseArray.copy(),
-            "observation": self.get_achieved_goal(),
+            "observation": currentPoseArray.copy(),
+            # "observation": self.get_achieved_goal(),
             "achieved_goal": self.get_achieved_goal(),
             "desired_goal": self.desired_goal
         }
@@ -360,12 +294,10 @@ class AbbEnv(gym.Env):
     # https://github.com/qgallouedec/panda-gym/blob/master/panda_gym/envs/tasks/reach.py
     def reset(self) -> Dict[str, np.ndarray]:
         self.desired_goal = self._sample_goal() 
-        # self.add_box(goal=self.desired_goal) # add box to rviz for visualization
+
         self.add_marker(goal=self.desired_goal) # add box to rviz for visualization
         self.move_joint_arm(0,0,0,0,0,0) #g o back to neutral position
         self.wait_time_for_execute_movement()
-        # return self.desired_goal
-        # print(self._get_obs())
         return self._get_obs()
 
     def _get_action_space(self)-> gym.spaces.Box:
@@ -384,7 +316,7 @@ class AbbEnv(gym.Env):
      
         joint_goal = self.arm_group.get_current_joint_values()
         while not (len(joint_goal) == 6):
-            print("wait robot joint")
+            print("[WARN] Waiting for robot joint values")
             joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.001)
@@ -505,7 +437,7 @@ class AbbEnv(gym.Env):
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
 
         if reward > -0.05 and reward < 0:
-            reward = 1
+            reward = 0
         elif reward < -0.8:
             reward = -1
         # d = np.linalg.norm(desired_goal - achieved_goal) 
@@ -552,53 +484,3 @@ class AbbEnv(gym.Env):
         self.marker_object.lifetime = rospy.Duration(0)
 
         self.marker_object_publisher.publish(self.marker_object)
-
-
-    # def wait_for_state_update(
-    #     self, box_is_known=False, box_is_attached=False, timeout=4
-    # ):
-
-    #     ## Ensuring Collision Updates Are Received
-    #     ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    #     ## If the Python node dies before publishing a collision object update message, the message
-    #     ## could get lost and the box will not appear. To ensure that the updates are
-    #     ## made, we wait until we see the changes reflected in the
-    #     ## ``get_attached_objects()`` and ``get_known_object_names()`` lists.
-    #     ## For the purpose of this tutorial, we call this function after adding,
-    #     ## removing, attaching or detaching an object in the planning scene. We then wait
-    #     ## until the updates have been made or ``timeout`` seconds have passed
-    #     start = rospy.get_time()
-    #     seconds = rospy.get_time()
-    #     while (seconds - start < timeout) and not rospy.is_shutdown():
-    #         # Test if the box is in attached objects
-    #         attached_objects = self.scene.get_attached_objects([self.box_name])
-    #         is_attached = len(attached_objects.keys()) > 0
-
-    #         # Test if the box is in the scene.
-    #         # Note that attaching the box will remove it from known_objects
-    #         is_known = self.box_name in self.scene.get_known_object_names()
-
-    #         # Test if we are in the expected state
-    #         if (box_is_attached == is_attached) and (box_is_known == is_known):
-    #             return True
-
-    #         # Sleep so that we give other threads time on the processor
-    #         rospy.sleep(0.1)
-    #         seconds = rospy.get_time()
-
-    #     # If we exited the while loop without returning then we timed out
-    #     return False
-
-
-    # def add_box(self, timeout=4,goal=[]):
-
-    #     box_pose = geometry_msgs.msg.PoseStamped()
-    #     box_pose.header.frame_id = "base_link"
-    #     box_pose.pose.orientation.w = 1.0
-    #     box_pose.pose.position.x = goal[0]
-    #     box_pose.pose.position.y = goal[1]
-    #     box_pose.pose.position.z = goal[2]
-    #     self.box_name = "box"
-    #     self.scene.add_box(self.box_name, box_pose, size=(0.01, 0.01, 0.01))
-    #     return self.wait_for_state_update(box_is_known=True, timeout=timeout)
-
