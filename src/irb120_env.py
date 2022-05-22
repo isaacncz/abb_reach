@@ -198,16 +198,22 @@ class AbbEnv(gym.Env):
         # print("current pose:",current_pose)
         achieved_goal = self.achieved_goal.copy()
         desired_goal = self.desired_goal.copy()
+
+        xyz_distance = np.subtract(desired_goal, achieved_goal)
+
         d = self.distance(achieved_goal, desired_goal)
 
         arrayOfPose = [    
             current_pose.position.x ,
             current_pose.position.y ,
             current_pose.position.z ,
+            xyz_distance[0],
+            xyz_distance[1],
+            xyz_distance[2],
             d
         ]
         currentPoseArray = np.array(arrayOfPose)
-        # print("current pose:",currentPoseArray) # to normalize this value
+        # print("Current pose:",currentPoseArray) # to normalize this value
 
         # joint_angles = self.arm_group.get_joint_value_target() # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # print("joint_angles: ",joint_angles)
@@ -324,9 +330,9 @@ class AbbEnv(gym.Env):
         joint_goal[0] = action[0] * math.radians(165) * scale
         joint_goal[1] = action[1] * math.radians(110) * scale
         joint_goal[2] = action[2] * math.radians(110) * scale
-        # joint_goal[0] = action[0] * 2.87979 * scale
-        # joint_goal[1] = action[1] * 1.91986 * scale
-        # joint_goal[2] = action[2] * 1.91986 * scale
+        # joint_goal[0] = action[0] * scale
+        # joint_goal[1] = action[1] * scale
+        # joint_goal[2] = action[2] * scale
         joint_goal[3] = 0
         joint_goal[4] = 0
         joint_goal[5] = 0
@@ -367,7 +373,7 @@ class AbbEnv(gym.Env):
             print("Episode finished")
         # info = {"is_success": done}
         # info = {"is_success": self.task.is_success(obs["achieved_goal"], self.task.get_goal())}
-        print("Reward:",reward," info:",info)
+        # print("Reward:",reward," info:",info)
         # reward, done, info = self.reward(rs_state=rs_state, action=action)
 
         # if self.rs_state_to_info: info['rs_state'] = self.rs_state

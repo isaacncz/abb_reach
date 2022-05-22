@@ -5,6 +5,9 @@ import numpy as np
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.callbacks import BaseCallback
 
+
+from datetime import datetime
+
 import telegram
 token = ""
 chat_id = 0
@@ -13,6 +16,8 @@ with open('src/config.txt') as f:
 token = lines[0]
 chat_id = int(lines[1])
 bot = telegram.Bot(token=token)
+path = "/home/isaac/irb120_ws/src/openai_abb/src/tensorboard"
+dir_list = os.listdir(path)
 
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
@@ -31,6 +36,41 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         self.log_dir = log_dir
         self.save_path = os.path.join(log_dir, 'best_model')
         self.best_mean_reward = -np.inf
+        self.logNumber = 0
+
+    def _on_training_start(self) -> None:
+        """
+        This method is called before the first rollout starts.
+        """
+        allNumber = []
+        for i in dir_list:
+            x = i.split("_")
+            number = int(x[1])
+            allNumber.append(number)
+        self.logNumber = max(allNumber) + 1
+
+        model_param = ""
+        model_param = "Training starts at " + datetime.now().strftime("%b-%d-%H:%M:%S")
+        model_param += "\nTQC_" + str(self.logNumber)
+        model_param += "\nlearning_rate:" + str(self.model.learning_rate)
+        model_param += "\nbuffer_size:" + str(self.model.buffer_size)
+        model_param += "\nbatch_size:" + str(self.model.batch_size)
+        model_param += "\ntau:" + str(self.model.tau)
+        model_param += "\ngamma:" + str(self.model.gamma)
+        model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
+        model_param += "\npolicy_kwargs:" + str(self.model.policy_kwargs)
+
+        print(model_param)
+        bot.send_message(text=model_param, chat_id=chat_id)
+
+
+    def _on_training_end(self) -> None:
+        """
+        This event is triggered before exiting the `learn()` method.
+        """
+
+        message = "Training for TQC_" + str(self.logNumber)+   " ends at " + datetime.now().strftime("%b-%d-%H:%M:%S")
+        bot.send_message(text=message, chat_id=452439053)
 
 
     def _init_callback(self) -> None:
@@ -50,7 +90,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                 print(f"Num timesteps: {self.num_timesteps}")
                 print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
                 # message = "Num timesteps: {self.num_timesteps} Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}"
-                message = "Timesteps: " + str(self.num_timesteps) + '\n Best mean: ' + str(self.best_mean_reward) + '\n Last mean:' + str(mean_reward)
+                message = "Timesteps: " + str(self.num_timesteps) + '\nBest mean: ' + str(self.best_mean_reward) + '\nLast mean:' + str(mean_reward)
                 bot.send_message(text=message, chat_id=chat_id)
               # New best model, you could save the agent here
               if mean_reward > self.best_mean_reward:
