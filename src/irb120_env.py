@@ -202,19 +202,20 @@ class AbbEnv(gym.Env):
         xyz_distance = np.subtract(desired_goal, achieved_goal)
 
         d = self.distance(achieved_goal, desired_goal)
-
-        arrayOfPose = [    
+        is_success = self.is_success(self.achieved_goal,self.desired_goal)
+        arrayOfObs = [    
             current_pose.position.x ,
             current_pose.position.y ,
             current_pose.position.z ,
             xyz_distance[0],
             xyz_distance[1],
             xyz_distance[2],
-            d
+            d,
+            is_success
         ]
-        currentPoseArray = np.array(arrayOfPose)
+        currentPoseArray = np.array(arrayOfObs)
         # print("Current pose:",currentPoseArray) # to normalize this value
-
+        # print("Current pose:",*currentPoseArray)
         # joint_angles = self.arm_group.get_joint_value_target() # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # print("joint_angles: ",joint_angles)
 
@@ -418,8 +419,8 @@ class AbbEnv(gym.Env):
         done = False
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
         
-        if reward > -0.05 and reward < 0:
-            reward = 0
+        if reward >= -0.05 and reward < 0:
+            reward = 1
             # done = True
         elif reward < -0.8:
             reward = -1
@@ -442,8 +443,8 @@ class AbbEnv(gym.Env):
 
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
 
-        if reward > -0.05 and reward < 0:
-            reward = 0
+        if reward >= -0.05 and reward < 0:
+            reward = 1
         elif reward < -0.8:
             reward = -1
         # d = np.linalg.norm(desired_goal - achieved_goal) 
