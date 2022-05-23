@@ -16,8 +16,8 @@ with open('src/config.txt') as f:
 token = lines[0]
 chat_id = int(lines[1])
 bot = telegram.Bot(token=token)
-path = "/home/isaac/irb120_ws/src/openai_abb/src/tensorboard"
-dir_list = os.listdir(path)
+
+
 
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
@@ -42,6 +42,8 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         """
         This method is called before the first rollout starts.
         """
+        path = "/home/isaac/irb120_ws/src/openai_abb/src/tensorboard"
+        dir_list = os.listdir(path)
         allNumber = []
         for i in dir_list:
             x = i.split("_")
@@ -59,7 +61,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         model_param += "\ngamma:" + str(self.model.gamma)
         model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
         model_param += "\npolicy_kwargs:" + str(self.model.policy_kwargs)
-
+        model_param += "\naction_noise:" + str(self.model.action_noise)
         print(model_param)
         bot.send_message(text=model_param, chat_id=chat_id)
 
