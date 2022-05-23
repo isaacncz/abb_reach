@@ -53,13 +53,13 @@ class AbbEnv(gym.Env):
         moveit_commander.roscpp_initialize(sys.argv)
         rospy.init_node('moving_irb120', anonymous=True)
         # Variables that we give through the constructor.
-        rospy.logdebug("Start abbenv INIT...")
+        # rospy.logdebug("Start abbenv INIT...")
         self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
         self.arm_group = moveit_commander.MoveGroupCommander("manipulator")
         self.arm_group.set_planner_id("RRTConnectkConfigDefault")
         # self.arm_group.set_planner_id("TRAC_IKKinematicsPlugin")
-        rospy.logdebug("end var INIT...")
+        # rospy.logdebug("end var INIT...")
 
         # RL 
 
@@ -204,9 +204,9 @@ class AbbEnv(gym.Env):
         d = self.distance(achieved_goal, desired_goal)
         is_success = self.is_success(self.achieved_goal,self.desired_goal)
         arrayOfObs = [    
-            current_pose.position.x ,
-            current_pose.position.y ,
-            current_pose.position.z ,
+            current_pose.position.x,
+            current_pose.position.y,
+            current_pose.position.z,
             xyz_distance[0],
             xyz_distance[1],
             xyz_distance[2],
@@ -245,11 +245,11 @@ class AbbEnv(gym.Env):
     # completed _check_joint_states_ready
     def _check_joint_states_ready(self):
         self.joint_states = None
-        rospy.logdebug("Waiting for /joint_states to be READY...")
+        # rospy.logdebug("Waiting for /joint_states to be READY...")
         while self.joint_states is None and not rospy.is_shutdown():
             try:
                 self.joint_states = self.robot.get_current_state()
-                rospy.logdebug("Current /joint_states READY=>")
+                # rospy.logdebug("Current /joint_states READY=>")
             except:
                 rospy.logerr("Current /joint_states not ready yet, retrying for getting joint_states")
         return self.joint_states
@@ -327,13 +327,13 @@ class AbbEnv(gym.Env):
             joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.001)
-        scale = 0.2
+        scale = 0.35
+        # joint_goal[0] = joint_goal[0] + (action[0] * scale)
+        # joint_goal[1] = joint_goal[1] + (action[1] * scale)
+        # joint_goal[2] = joint_goal[2] + (action[2] * scale)
         joint_goal[0] = action[0] * math.radians(165) * scale
         joint_goal[1] = action[1] * math.radians(110) * scale
         joint_goal[2] = action[2] * math.radians(110) * scale
-        # joint_goal[0] = action[0] * scale
-        # joint_goal[1] = action[1] * scale
-        # joint_goal[2] = action[2] * scale
         joint_goal[3] = 0
         joint_goal[4] = 0
         joint_goal[5] = 0
@@ -359,15 +359,15 @@ class AbbEnv(gym.Env):
 
         if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
             done = True 
-            reward = -100
+            reward = -50
             print("joint 1 limit exceeds")
         if joint_goal[1] > 1.047 or joint_goal[1] < -1.047: # if more/less than +-60 degree
             done = True 
-            reward = -100
+            reward = -50
             print("joint 2 limit exceeds")
         if joint_goal[2] > 1.047 or joint_goal[2] < -1.047: # if more/less than +-60 degree
             done = True 
-            reward = -100
+            reward = -50
             print("joint 3 limit exceeds")
 
         if done:
@@ -420,7 +420,7 @@ class AbbEnv(gym.Env):
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
         
         if reward >= -0.05 and reward < 0:
-            reward = 1
+            reward = 0
             # done = True
         elif reward < -0.8:
             reward = -1
@@ -444,7 +444,7 @@ class AbbEnv(gym.Env):
         reward = -np.linalg.norm(desired_goal - achieved_goal) 
 
         if reward >= -0.05 and reward < 0:
-            reward = 1
+            reward = 0
         elif reward < -0.8:
             reward = -1
         # d = np.linalg.norm(desired_goal - achieved_goal) 
