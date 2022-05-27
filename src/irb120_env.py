@@ -62,7 +62,6 @@ class AbbEnv(gym.Env):
         # rospy.logdebug("end var INIT...")
 
         # RL 
-
         self.distance_threshold = 0.05
         self.reward_type = "dense"
 
@@ -137,6 +136,7 @@ class AbbEnv(gym.Env):
             self.achieved_goal = position
             # print('self.achieved_goal',self.achieved_goal)
             return position
+        print(lastPosition) 
         return lastPosition
 
     def plan_cartesian_path(self,x,y,z):
@@ -207,11 +207,11 @@ class AbbEnv(gym.Env):
             current_pose.position.x,
             current_pose.position.y,
             current_pose.position.z,
-            xyz_distance[0],
-            xyz_distance[1],
-            xyz_distance[2],
-            d,
-            is_success
+            # xyz_distance[0],
+            # xyz_distance[1],
+            # xyz_distance[2],
+            d
+            # is_success
         ]
         currentPoseArray = np.array(arrayOfObs)
         # print("Current pose:",currentPoseArray) # to normalize this value
@@ -327,13 +327,13 @@ class AbbEnv(gym.Env):
             joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.001)
-        scale = 0.35
+        # scale = 1
         # joint_goal[0] = joint_goal[0] + (action[0] * scale)
         # joint_goal[1] = joint_goal[1] + (action[1] * scale)
         # joint_goal[2] = joint_goal[2] + (action[2] * scale)
-        joint_goal[0] = action[0] * math.radians(165) * scale
-        joint_goal[1] = action[1] * math.radians(110) * scale
-        joint_goal[2] = action[2] * math.radians(110) * scale
+        joint_goal[0] = action[0] * math.radians(70) 
+        joint_goal[1] = action[1] * math.radians(50) 
+        joint_goal[2] = action[2] * math.radians(50) 
         joint_goal[3] = 0
         joint_goal[4] = 0
         joint_goal[5] = 0
@@ -357,18 +357,18 @@ class AbbEnv(gym.Env):
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
         reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
 
-        if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
-            done = True 
-            reward = -50
-            print("joint 1 limit exceeds")
-        if joint_goal[1] > 1.047 or joint_goal[1] < -1.047: # if more/less than +-60 degree
-            done = True 
-            reward = -50
-            print("joint 2 limit exceeds")
-        if joint_goal[2] > 1.047 or joint_goal[2] < -1.047: # if more/less than +-60 degree
-            done = True 
-            reward = -50
-            print("joint 3 limit exceeds")
+        # if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
+        #     done = True 
+        #     reward = -50
+        #     print("joint 1 limit exceeds")
+        # if joint_goal[1] > 1.047 or joint_goal[1] < -1.047: # if more/less than +-60 degree
+        #     done = True 
+        #     reward = -50
+        #     print("joint 2 limit exceeds")
+        # if joint_goal[2] > 1.047 or joint_goal[2] < -1.047: # if more/less than +-60 degree
+        #     done = True 
+        #     reward = -50
+        #     print("joint 3 limit exceeds")
 
         if done:
             print("Episode finished")
@@ -382,9 +382,10 @@ class AbbEnv(gym.Env):
 
     def _sample_goal(self) -> np.ndarray:
         """Randomize goal."""
-        x = random.uniform(0.3, 0.45)
+        x = random.uniform(0.3, 0.4)
         y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.2, 0.35)
+        z = random.uniform(0.25, 0.35)
+
         goal = np.array([x,y,z])
 
         print("sample goal (xyz):",goal)
@@ -393,7 +394,8 @@ class AbbEnv(gym.Env):
     def is_success(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> Union[np.ndarray, float]:
         d = self.distance(achieved_goal, desired_goal)
         # return 1-d 
-        return np.array(d < self.distance_threshold, dtype=np.float64)
+        # print(np.array(d <= self.distance_threshold, dtype=np.float64))
+        return np.array(d <= self.distance_threshold, dtype=np.float64)
 
     def distance(self,a: np.ndarray, b: np.ndarray) -> Union[float, np.ndarray]:
         """Compute the distance between two array. This function is vectorized.
@@ -417,47 +419,38 @@ class AbbEnv(gym.Env):
             [np.float32]: Dense Reward
         """
         done = False
-        reward = -np.linalg.norm(desired_goal - achieved_goal) 
-        
-        if reward >= -0.05 and reward < 0:
-            reward = 0
-            # done = True
-        elif reward < -0.8:
+
+        d = np.linalg.norm(desired_goal - achieved_goal) 
+        if d <= self.distance_threshold:
+            reward = 1
+        elif d > 0.2:
             reward = -1
-            # done = True
-
-        # done = False
-        # reward = np.linalg.norm(desired_goal - achieved_goal) 
-        # reward = -np.power(d,0.7)
-
-        # d = -d
-        # if d >= -0.05 and d < 0:
-        #     reward = 1
-        # elif d < -0.8:
-        #     reward = -1
+        else: 
+            # reward = 1-d
+            reward = -np.power(d,0.9)
+            # reward = 1-np.power(d,0.05)
 
         return reward, done
 
-
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
 
-        reward = -np.linalg.norm(desired_goal - achieved_goal) 
-
-        if reward >= -0.05 and reward < 0:
-            reward = 0
-        elif reward < -0.8:
-            reward = -1
-        # d = np.linalg.norm(desired_goal - achieved_goal) 
-        # reward = -np.power(d,0.7)
-
-        # d = -d
-        # if d >= -0.05 and d < 0:
+        d = np.linalg.norm(desired_goal - achieved_goal) 
+        # if d > self.distance_threshold:
+        #     reward = self.remapReward(d)
+        # else: 
         #     reward = 1
-        # elif d < -0.8:
-        #     reward = -1
 
+        if d <= self.distance_threshold:
+            reward = 1
+        elif d > 0.2:
+            reward = -1
+        else: 
+            # reward = 1-d
+            # reward = 1-np.power(d,0.05)
+            reward = -np.power(d,0.9)
+            # reward = self.remapReward(d)
         return reward
-
+    
     def add_marker(self,goal=[]):
         self.marker_object_publisher = rospy.Publisher('/marker_basic',Marker,queue_size=1)
         self.rate = rospy.Rate(120)
