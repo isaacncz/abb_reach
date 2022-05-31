@@ -18,9 +18,64 @@ from stable_baselines3 import HerReplayBuffer, DDPG, DQN, SAC, TD3, PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 import numpy as np
 
+import rospy
+from std_msgs.msg import String
+from geometry_msgs.msg import Pose
+target_pose=Pose() # declaring a message variable of type Int32
 
+
+
+def callback(data):
+    global globalPosition
+    pos = data.position
+    # print(globalPosition)
+    
+    abb.desired_goal = np.array([pos.x,pos.y,0.25])
+    obs = abb._get_obs()
+    print(abb.desired_goal)
+    action, _states = model.predict(obs, deterministic=True)
+    obs, reward, done, info = abb.step(action)
+
+    # print(rospy.get_caller_id() + "I heard %s", data.data)
+    
+def listener():
+    # In ROS, nodes are uniquely named. If two nodes with the same
+    # name are launched, the previous one is kicked off. The
+    # anonymous=True flag means that rospy will choose a unique
+    # name for our 'listener' node so that multiple listeners can
+    # run simultaneously.
+    # print("starts")
+    # rospy.init_node('listener', anonymous=True)
+
+    rospy.Subscriber("follow_blob", Pose, callback)
+
+    # spin() simply keeps python from exiting until this node is stopped
+    rospy.spin()
 
 if __name__ == '__main__':
+
+
+    # env = gym.make('AbbReach-v0')
+
+    model = TQC.load("/home/isaac/Desktop/model_storage/TQC_May-30:11:19:04.zip")
+
+
+    # obs = env.reset()
+
+    # print(obs)
+    # while True:
+    #     action, _states = model.predict(obs, deterministic=True)
+    #     obs, reward, done, info = env.step(action)
+    #     if done:
+    #         obs = env.reset()
+
+    # evaluate policy
+    # mean_reward, std_reward = evaluate_policy(model.policy, env, n_eval_episodes=10, deterministic=True)
+
+    # print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
+
+
+    
     # # abb._check_all_systems_ready()
     # # print(abb.get_achieved_goal())
     # # [0.23269473 0.26516924 0.29481993]
@@ -30,7 +85,15 @@ if __name__ == '__main__':
     # # plan = abb.go_to_pose_goal(x=xyz[0],y=xyz[1],z=xyz[2])
 
     # action_plan = abb.plan_cartesian_path(x=xyz[0],y=xyz[1],z=xyz[2])
-    # abb = AbbEnv()
+    abb = AbbEnv()
+    obs = abb.reset()
+    # obs = abb.reset()
+    # abb.desired_goal = np.array[target_pose.position.x,target_pose.position.y,target_pose.position.z]
+    # print(globalPosition)
+    listener()
+    # action, _states = model.predict(obs, deterministic=True)
+    # obs, reward, done, info = abb.step(action)
+
     # abb._check_all_systems_ready()
     # abb.reset()
 
@@ -87,18 +150,34 @@ if __name__ == '__main__':
 
     # abb.step(abb.sample_action_by_joint_values())
 
-    env = gym.make('AbbReach-v0')
-    observation = env.reset()
-    action = [-1,-1,1]
-    observation, reward, done, info = env.step(action)
-    print(observation, reward, done, info)
+    # env = gym.make('AbbReach-v0')
+    # observation = env.reset()
+    # observation = env.reset()
 
-    # for i_episode in range(1):
+    # action = [1,1,0]
+    # observation, reward, done, info = env.step(action)
+    # print(observation, reward, done, info)
+
+    # action = [1,-1,0]
+    # observation, reward, done, info = env.step(action)
+    # print(observation, reward, done, info)
+    # action = [0.7,0.9,-0.2]
+    # observation, reward, done, info = env.step(action)
+    # print(observation, reward, done, info)
+
+    # for i_episode in range(100):
+
+    #     observation = env.reset()
+    #     action = [1,1,-0.5]
+    #     observation, reward, done, info = env.step(action)
+    #     print(observation, reward, done, info)
+
+    # for i_episode in range(5):
     #     observation = env.reset()
     #     for t in range(10):
-    #         # print(observation)
     #         action = env.action_space.sample()
     #         observation, reward, done, info = env.step(action)
+    #         print(reward,done,info)
     #         if done:
     #             print("Episode finished after {} timesteps".format(t+1))
     #             break

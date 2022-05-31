@@ -355,7 +355,7 @@ class AbbEnv(gym.Env):
         # print("compute reward here:",self.compute_reward(self.achieved_goal,self.desired_goal))
 
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
-        reward, done = self.dense_reward(self.achieved_goal,self.desired_goal)
+        reward = self.compute_reward(self.achieved_goal,self.desired_goal,info)
 
         # if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
         #     done = True 
@@ -423,11 +423,11 @@ class AbbEnv(gym.Env):
         d = np.linalg.norm(desired_goal - achieved_goal) 
         if d <= self.distance_threshold:
             reward = 1
-        elif d > 0.2:
+        elif d > 0.15:
             reward = -1
         else: 
             # reward = 1-d
-            reward = -np.power(d,0.9)
+            reward = -np.power(d,0.05)
             # reward = 1-np.power(d,0.05)
 
         return reward, done
@@ -442,12 +442,12 @@ class AbbEnv(gym.Env):
 
         if d <= self.distance_threshold:
             reward = 1
-        elif d > 0.2:
+        elif d > 0.15:
             reward = -1
         else: 
             # reward = 1-d
             # reward = 1-np.power(d,0.05)
-            reward = -np.power(d,0.9)
+            reward = -np.power(d,0.05)
             # reward = self.remapReward(d)
         return reward
     

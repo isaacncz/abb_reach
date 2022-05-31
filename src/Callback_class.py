@@ -30,13 +30,14 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
       It must contains the file created by the ``Monitor`` wrapper.
     :param verbose: (int)
     """
-    def __init__(self, check_freq: int, log_dir: str, verbose=1):
+    def __init__(self, check_freq: int, log_dir: str, verbose=1,device="1"):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
         self.log_dir = log_dir
         self.save_path = os.path.join(log_dir, 'best_model')
         self.best_mean_reward = -np.inf
         self.logNumber = 0
+        self.device = device
 
     def _on_training_start(self) -> None:
         """
@@ -49,21 +50,24 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
             x = i.split("_")
             number = int(x[1])
             allNumber.append(number)
-        self.logNumber = max(allNumber) + 1
+        self.logNumber = max(allNumber) 
 
         model_param = ""
-        model_param = "Training starts at " + datetime.now().strftime("%b-%d-%H:%M:%S")
+        model_param = "Training starts at device (" + self.device + ") " + datetime.now().strftime("%b-%d_%H:%M:%S")
         model_param += "\nTQC_" + str(self.logNumber)
         model_param += "\nlearning_rate:" + str(self.model.learning_rate)
         model_param += "\nbuffer_size:" + str(self.model.buffer_size)
         model_param += "\nbatch_size:" + str(self.model.batch_size)
         model_param += "\ntau:" + str(self.model.tau)
         model_param += "\ngamma:" + str(self.model.gamma)
-        model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
+        # model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
         model_param += "\npolicy_kwargs:" + str(self.model.policy_kwargs)
-        model_param += "\naction_noise:" + str(self.model.action_noise)
+        # model_param += "\naction_noise:" + str(self.model.action_noise)
+        model_param += "\nreplay_buffer_kwargs:" + str(self.model.replay_buffer_kwargs)
         print(model_param)
         bot.send_message(text=model_param, chat_id=chat_id)
+        # message = str(self.model.observation_space)
+        # bot.send_message(text=message, chat_id=chat_id)
 
 
     def _on_training_end(self) -> None:
@@ -71,7 +75,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         This event is triggered before exiting the `learn()` method.
         """
 
-        message = "Training for TQC_" + str(self.logNumber)+   " ends at " + datetime.now().strftime("%b-%d-%H:%M:%S")
+        message = "Training for TQC_" + str(self.logNumber)+   " ends at " + datetime.now().strftime("%b-%d_%H:%M:%S")
         bot.send_message(text=message, chat_id=452439053)
 
 
@@ -92,7 +96,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                 print(f"Num timesteps: {self.num_timesteps}")
                 print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
                 # message = "Num timesteps: {self.num_timesteps} Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}"
-                message = "Timesteps: " + str(self.num_timesteps) + '\nBest mean: ' + str(self.best_mean_reward) + '\nLast mean:' + str(mean_reward)
+                message = "Device (" + self.device + ")\n " +"Timesteps: " + str(self.num_timesteps) + '\nBest mean: ' + str(self.best_mean_reward) + '\nLast mean:' + str(mean_reward)
                 bot.send_message(text=message, chat_id=chat_id)
               # New best model, you could save the agent here
               if mean_reward > self.best_mean_reward:
