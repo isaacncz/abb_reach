@@ -23,7 +23,7 @@ pub = rospy.Publisher('follow_blob', Pose, queue_size=10)
 target_pose=Pose() # declaring a message variable of type Int32
 
 
-CM_TO_PIXEL = 31.4 / 640
+CM_TO_PIXEL = 60 / 640
 
 # def openCamera():
 # 	cap=cv2.VideoCapture(0)
@@ -42,7 +42,7 @@ def main():
 	y2_remap=0.0
 	x_d_p=0.0
 	y_d_p=0.0
-	cap=cv2.VideoCapture(7)
+	cap=cv2.VideoCapture(0)
 	width  = cap.get(cv2.CAP_PROP_FRAME_WIDTH )   # float `width`
 	height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float `height`
 	print(width, height)
@@ -54,19 +54,19 @@ def main():
 		#converting frame(img i.e BGR) to HSV (hue-saturation-value)
 
 		hsv=cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
-		blue_lower=np.array([0,143,130],np.uint8)
-		blue_upper=np.array([202,203,210],np.uint8)
+		blue_lower=np.array([132,100,52],np.uint8)
+		blue_upper=np.array([222,222,222],np.uint8)
 
 
 		blue=cv2.inRange(hsv,blue_lower,blue_upper)
 		
 		#Morphological transformation, Dilation  	
-		kernal = np.ones((5 ,5), "uint8")
+		# kernal = np.ones((5 ,5), "uint8")
 
 
-		blue=cv2.dilate(blue,kernal)
+		# blue=cv2.dilate(blue,kernal)
 
-		img=cv2.circle(img,(260,68),5,(255,0,0),-1)
+		# img=cv2.circle(img,(260,68),5,(255,0,0),-1)
 
 				
 		#Tracking the Blue Color
@@ -88,28 +88,26 @@ def main():
 				# instead of pixel coordinates
 				x2_cm = x2 * CM_TO_PIXEL
 				y2_cm = y2 * CM_TO_PIXEL
-				x2_remap = remapValue(0,30,0.35,-0.35,x2_cm)
-				y2_remap = remapValue(0,23.8,0.4,0.3,y2_cm)
-				# x2_remap = remapValue(0,32,0.35,0.25,x2_cm)
-				# y2_remap = remapValue(0,23.8,11.9,-11.9,y2_cm)
-				x2_cm = round(x2_cm,2)
-				y2_cm=round(y2_cm,2)
-				x2_remap=round(x2_remap,2)
-				y2_remap=round(y2_remap,2)
+				# x2_remap = remapValue(0,60,-0.35,0.35,x2_cm)
+				# y2_remap = remapValue(0,44,0.3,0.4,y2_cm)
+				# # x2_remap = remapValue(0,32,0.35,0.25,x2_cm)
+				# # y2_remap = remapValue(0,23.8,11.9,-11.9,y2_cm)
+				# x2_cm = round(x2_cm,7)
+				# y2_cm=round(y2_cm,7)
+				# x2_remap=round(x2_remap,7)
+				# y2_remap=round(y2_remap,7)
 
-				s = "x: " + str(x2_cm) + ", y: " + str(y2_cm)+  "xr: " + str(x2_remap) + ", yr: " + str(y2_remap)
+				s = "x: " + str(x2_cm) + ", y: " + str(y2_cm)
 				top = y - 15 if y - 15 > 15 else y + 15
 				cv2.putText(img,s,(x-20,top),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0),1,cv2.LINE_AA)
 			
-
-			
-				if (abs(x2_remap-x_d_p)> 0.01 or abs(y2_remap-y_d_p)>0.01):
-					target_pose.position.x=y2_remap
-					target_pose.position.y=x2_remap
+				if (abs(x2_cm-x_d_p)> 1 or abs(y2_cm-y_d_p)>1):
+					target_pose.position.x=x2_cm
+					target_pose.position.y=y2_cm
 					target_pose.position.z=0.0
 					pub.publish(target_pose)
-					x_d_p=x2_remap
-					y_d_p=y2_remap
+					x_d_p=x2_cm
+					y_d_p=y2_cm
 				
 			
 		
