@@ -3,25 +3,16 @@ import rospy
 import sys
 import moveit_commander
 import moveit_msgs.msg
-
 from moveit_msgs.srv import GetPositionFK, GetPositionFKRequest
 import geometry_msgs.msg
 import copy
-from std_msgs.msg import Header
-from moveit_commander.conversions import pose_to_list
-from sensor_msgs.msg import JointState
 
-from math import pi
 import math
-import os
 from gym import spaces
 import gym
 
-# moveit reference
-# http://docs.ros.org/en/jade/api/moveit_commander/html/classmoveit__commander_1_1move__group_1_1MoveGroupCommander.html#a6a4440597144e033cd1749e0e00716ca
-
 # distance
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 # generate random number
 import random
 
@@ -59,7 +50,6 @@ class AbbEnv(gym.Env):
         self.arm_group = moveit_commander.MoveGroupCommander("manipulator")
         self.arm_group.set_planner_id("RRTConnectkConfigDefault")
         # self.arm_group.set_planner_id("TRAC_IKKinematicsPlugin")
-        # rospy.logdebug("end var INIT...")
 
         # RL 
         self.distance_threshold = 0.05
@@ -88,7 +78,6 @@ class AbbEnv(gym.Env):
             )
         )
         # print(self.observation_space)
-
 
         # Misc variables
         self.box_name = "box"
@@ -177,7 +166,7 @@ class AbbEnv(gym.Env):
         self.arm_group.set_goal_joint_tolerance(0.001)
         # print("joint goal:",joint_goal)
         convertToNumpy = np.array(joint_goal)
-        # print("joint numpy:",convertToNumpy)
+
         joint_goal[0] = joint_0
         joint_goal[1] = joint_1
         joint_goal[2] = joint_2
@@ -210,16 +199,10 @@ class AbbEnv(gym.Env):
             # xyz_distance[0],
             # xyz_distance[1],
             # xyz_distance[2],
-            d
+            # d,
             # is_success
         ]
         currentPoseArray = np.array(arrayOfObs)
-        # print("Current pose:",currentPoseArray) # to normalize this value
-        # print("Current pose:",*currentPoseArray)
-        # joint_angles = self.arm_group.get_joint_value_target() # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        # print("joint_angles: ",joint_angles)
-
-        # return currentPoseArray.copy()
 
         return {
             "observation": currentPoseArray.copy(),
@@ -254,10 +237,6 @@ class AbbEnv(gym.Env):
                 rospy.logerr("Current /joint_states not ready yet, retrying for getting joint_states")
         return self.joint_states
     
-    # Methods that the TrainingEnvironment will need to define here as virtual
-    # because they will be used in RobotGazeboEnv GrandParentClass and defined in the
-    # TrainingEnvironment.
-    # ----------------------------
     def _set_init_pose(self):
         """Sets the Robot in its init pose
         """
@@ -289,16 +268,9 @@ class AbbEnv(gym.Env):
         raise NotImplementedError()
     
     def wait_time_for_execute_movement(self):
-        """
-        Because this Parrot Drone position is global, we really dont have
-        a way to know if its moving in the direction desired, because it would need
-        to evaluate the diference in position and speed on the local reference.
-        """
         rospy.sleep(1.0)
 
 
-    # from panda gym
-    # https://github.com/qgallouedec/panda-gym/blob/master/panda_gym/envs/tasks/reach.py
     def reset(self) -> Dict[str, np.ndarray]:
         self.desired_goal = self._sample_goal() 
 
@@ -327,19 +299,13 @@ class AbbEnv(gym.Env):
             joint_goal = self.arm_group.get_current_joint_values()
 
         self.arm_group.set_goal_joint_tolerance(0.001)
-        # scale = 1
-        # joint_goal[0] = joint_goal[0] + (action[0] * scale)
-        # joint_goal[1] = joint_goal[1] + (action[1] * scale)
-        # joint_goal[2] = joint_goal[2] + (action[2] * scale)
+
         joint_goal[0] = action[0] * math.radians(70) 
         joint_goal[1] = action[1] * math.radians(50) 
         joint_goal[2] = action[2] * math.radians(50) 
         joint_goal[3] = 0
         joint_goal[4] = 0
         joint_goal[5] = 0
-        # joint_goal[3] = action[3] * 2.79253 * 0.1
-        # joint_goal[4] = action[4] * 2.09440 * 0.1
-        # joint_goal[5] = action[5] * 6.98132 * 0.1
 
         self.arm_group.go(joint_goal, wait=True)
         self.arm_group.stop() # To guarantee no residual movement
@@ -357,34 +323,19 @@ class AbbEnv(gym.Env):
         info = {"is_success":self.is_success(self.achieved_goal,self.desired_goal)}
         reward = self.compute_reward(self.achieved_goal,self.desired_goal,info)
 
-        # if joint_goal[0] > pi/2 or joint_goal[0] < -pi/2: # if more/less than +-90 degree
-        #     done = True 
-        #     reward = -50
-        #     print("joint 1 limit exceeds")
-        # if joint_goal[1] > 1.047 or joint_goal[1] < -1.047: # if more/less than +-60 degree
-        #     done = True 
-        #     reward = -50
-        #     print("joint 2 limit exceeds")
-        # if joint_goal[2] > 1.047 or joint_goal[2] < -1.047: # if more/less than +-60 degree
-        #     done = True 
-        #     reward = -50
-        #     print("joint 3 limit exceeds")
-
         if done:
             print("Episode finished")
         # info = {"is_success": done}
         # info = {"is_success": self.task.is_success(obs["achieved_goal"], self.task.get_goal())}
         # print("Reward:",reward," info:",info)
-        # reward, done, info = self.reward(rs_state=rs_state, action=action)
 
-        # if self.rs_state_to_info: info['rs_state'] = self.rs_state
         return state, reward, done, info
 
     def _sample_goal(self) -> np.ndarray:
         """Randomize goal."""
         x = random.uniform(0.3, 0.4)
-        y = random.uniform(-0.35, 0.35)
-        z = random.uniform(0.25, 0.35)
+        y = random.uniform(-0.25, 0.25)
+        z = random.uniform(0.2, 0.5)
 
         goal = np.array([x,y,z])
 
@@ -393,8 +344,7 @@ class AbbEnv(gym.Env):
 
     def is_success(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> Union[np.ndarray, float]:
         d = self.distance(achieved_goal, desired_goal)
-        # return 1-d 
-        # print(np.array(d <= self.distance_threshold, dtype=np.float64))
+
         return np.array(d <= self.distance_threshold, dtype=np.float64)
 
     def distance(self,a: np.ndarray, b: np.ndarray) -> Union[float, np.ndarray]:
@@ -408,47 +358,16 @@ class AbbEnv(gym.Env):
         assert a.shape == b.shape
         return np.linalg.norm(a - b, axis=-1)
 
-    def dense_reward(self, achieved_goal, desired_goal):
-        """
-        Description:
-            Generates a dense reward for the given states.
-        Args:
-            desired_goal ([type=np.float32, size=(desired_goal.shape,)]): Desired Goal Position
-            achieved_goal ([type]): [description]
-        Returns:
-            [np.float32]: Dense Reward
-        """
-        done = False
-
-        d = np.linalg.norm(desired_goal - achieved_goal) 
-        if d <= self.distance_threshold:
-            reward = 1
-        elif d > 0.15:
-            reward = -1
-        else: 
-            # reward = 1-d
-            reward = -np.power(d,0.05)
-            # reward = 1-np.power(d,0.05)
-
-        return reward, done
-
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> Union[np.ndarray, float]:
 
         d = np.linalg.norm(desired_goal - achieved_goal) 
-        # if d > self.distance_threshold:
-        #     reward = self.remapReward(d)
-        # else: 
-        #     reward = 1
 
         if d <= self.distance_threshold:
             reward = 1
         elif d > 0.15:
             reward = -1
         else: 
-            # reward = 1-d
-            # reward = 1-np.power(d,0.05)
             reward = -np.power(d,0.05)
-            # reward = self.remapReward(d)
         return reward
     
     def add_marker(self,goal=[]):
