@@ -46,7 +46,6 @@ while(1):
 
 	color=cv2.dilate(color,kernal)
            
-           
 	cv2.imshow("Color",color)
 	cv2.imshow("Original Image",img)	
     	 

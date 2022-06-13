@@ -18,8 +18,6 @@ chat_id = int(lines[1])
 bot = telegram.Bot(token=token)
 
 
-
-
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
     Callback for saving a model (the check is done every ``check_freq`` steps)
@@ -60,23 +58,21 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         model_param += "\nbatch_size:" + str(self.model.batch_size)
         model_param += "\ntau:" + str(self.model.tau)
         model_param += "\ngamma:" + str(self.model.gamma)
-        # model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
+        model_param += "\ntop_quantiles_to_drop_per_net:" + str(self.model.top_quantiles_to_drop_per_net)
         model_param += "\npolicy_kwargs:" + str(self.model.policy_kwargs)
         # model_param += "\naction_noise:" + str(self.model.action_noise)
         model_param += "\nreplay_buffer_kwargs:" + str(self.model.replay_buffer_kwargs)
         print(model_param)
-        bot.send_message(text=model_param, chat_id=chat_id)
-        # message = str(self.model.observation_space)
-        # bot.send_message(text=message, chat_id=chat_id)
-
+        if bot and chat_id:
+            bot.send_message(text=model_param, chat_id=chat_id)
 
     def _on_training_end(self) -> None:
         """
         This event is triggered before exiting the `learn()` method.
         """
-
         message = "Training for TQC_" + str(self.logNumber)+   " ends at " + datetime.now().strftime("%b-%d_%H:%M:%S")
-        bot.send_message(text=message, chat_id=452439053)
+        if bot and chat_id:
+            bot.send_message(text=message, chat_id=chat_id)
 
 
     def _init_callback(self) -> None:
@@ -96,16 +92,15 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                 print(f"Num timesteps: {self.num_timesteps}")
                 print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
                 # message = "Num timesteps: {self.num_timesteps} Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}"
-                message = "Device (" + self.device + ")\n " +"Timesteps: " + str(self.num_timesteps) + '\nBest mean: ' + str(self.best_mean_reward) + '\nLast mean:' + str(mean_reward)
-                bot.send_message(text=message, chat_id=chat_id)
+                message = "Device (" + self.device + ")\n" +"Timesteps: " + str(self.num_timesteps) + '\nBest mean: ' + str(self.best_mean_reward) + '\nLast mean:' + str(mean_reward)
+                if bot and chat_id:
+                    bot.send_message(text=message, chat_id=chat_id)
               # New best model, you could save the agent here
               if mean_reward > self.best_mean_reward:
                   self.best_mean_reward = mean_reward
                   # Example for saving best model
                   if self.verbose > 0:
                     print(f"Saving new best model to {self.save_path}.zip")
-                    # message = "Saving new best model"
-                    # bot.send_message(text=message, chat_id=chat_id)
                   self.model.save(self.save_path)
                   self.model.save_replay_buffer(os.path.join(self.log_dir,'best_replay_buffer'))
 

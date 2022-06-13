@@ -2,24 +2,17 @@
 import rospy
 import moveit_commander
 from irb120_env import AbbEnv
-from math import pi
 import gym
-import numpy as np
 
-from stable_baselines3 import HerReplayBuffer, DDPG, DQN, SAC, TD3, PPO
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.logger import configure
+from stable_baselines3 import HerReplayBuffer
 from stable_baselines3.common.monitor import Monitor
-
+from stable_baselines3.common.callbacks import CheckpointCallback
 from sb3_contrib import TQC
 
 from Callback_class import SaveOnBestTrainingRewardCallback
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import CheckpointCallback
 
 import os
 from datetime import datetime
-
 
 
 if __name__ == '__main__':
@@ -41,45 +34,33 @@ if __name__ == '__main__':
                             n_sampled_goal=4
                            )
 
-    # actor (aka pi) and the critic (Q-function aka qf) networks,
-    # net_arch=dict(pi=[64,64], qf=[128,128]), done no good
-    # net_arch=dict(pi=[128,128], qf=[64,64]), good result and learning rate
-    # goal_selection_strategy='final', net_arch=dict(pi=[128,128,128], qf=[256,256]), test actor combination 1
-    # net_arch=dict(pi=[256,256], qf=[64,64]), test actor combination 2
-
-    # policy_kwargs = dict(net_arch=dict(pi=[128,128], qf=[64,64]),
-    #                     n_critics=2, 
-    #                     n_quantiles=25
-    #                     )
-    policy_kwargs = dict(net_arch=[256,256],
+    policy_kwargs = dict(net_arch=[128,128],
                         n_critics=2, 
-                        n_quantiles=25
+                        n_quantiles=30
                         )
 
     model = TQC("MultiInputPolicy", 
                 env, 
                 verbose=1, 
                 policy_kwargs=policy_kwargs, 
-                learning_rate=0.005, 
-                buffer_size=20000, 
+                learning_rate=0.01, 
+                buffer_size=50000, 
                 learning_starts=200, 
-                batch_size=16,#16,32,64,128
+                batch_size=512,#256,512,1024
                 tau=0.005, 
                 gamma=0.95, 
-                train_freq=1, 
-                gradient_steps=1, 
                 replay_buffer_class=HerReplayBuffer, 
                 replay_buffer_kwargs=replay_buffer_kwargs, 
                 target_update_interval=1, 
                 target_entropy='auto', 
-                top_quantiles_to_drop_per_net=2, 
+                top_quantiles_to_drop_per_net=3, 
                 use_sde=False, 
                 create_eval_env=True,
                 tensorboard_log="/home/isaac/irb120_ws/src/openai_abb/src/tensorboard"
                 )
 
     model.learn(
-        total_timesteps=int(25000),
+        total_timesteps=int(30000),
         callback=[callback,checkpoint_callback,], 
         eval_log_path="./logs/1/", 
         n_eval_episodes=5,
@@ -90,16 +71,8 @@ if __name__ == '__main__':
     model.save_replay_buffer("/home/isaac/Desktop/model_storage/TQC_RB_"+datetime.now().strftime("%b-%d:%H:%M:%S"))
     del model
 
-
-
-
     rospy.loginfo("All movements finished. Shutting down")	
     moveit_commander.roscpp_shutdown()
-
-
-
-
-
 
 
     # # continue training
@@ -113,16 +86,3 @@ if __name__ == '__main__':
     # # model.learn(total_timesteps=int(25000),callback=[callback,checkpoint_callback], eval_log_path="./logs/", n_eval_episodes=5,eval_freq=1000)
     # loaded_model.save("/home/isaac/Desktop/model_storage/TQC_"+datetime.now().strftime("%b-%d:%H:%M:%S"))
     # loaded_model.save_replay_buffer("best_replay_buffer_2")
-
-
-    # continue training for TQC_142
-    # loaded_model = TQC.load('/home/isaac/Desktop/model_storage/TQC_May-30:11:19:04.zip',env=env, tensorboard_log="/home/isaac/irb120_ws/src/openai_abb/src/tensorboard")
-    # # load it into the loaded_model
-    # # loaded_model.load_replay_buffer("/home/isaac/irb120_ws/src/openai_abb/training/best_replay_buffer.pkl")
-
-    # # now the loaded replay is not empty anymore
-    # # print(f"The loaded_model has {loaded_model.replay_buffer.size()} transitions in its buffer")
-    # loaded_model.learn(total_timesteps=int(20000),callback=[callback,checkpoint_callback], eval_log_path="./logs/", n_eval_episodes=5,eval_freq=500)
-    # # model.learn(total_timesteps=int(25000),callback=[callback,checkpoint_callback], eval_log_path="./logs/", n_eval_episodes=5,eval_freq=1000)
-    # loaded_model.save("/home/isaac/Desktop/model_storage/TQC_"+datetime.now().strftime("%b-%d:%H:%M:%S"))
-    # # loaded_model.save_replay_buffer("best_replay_buffer_2")

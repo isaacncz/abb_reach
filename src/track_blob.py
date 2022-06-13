@@ -1,41 +1,25 @@
 #!/usr/bin/env python
 
-# https://automaticaddison.com/how-to-convert-camera-pixels-to-robot-base-frame-coordinates/
-
-
-
 import rospy
 from std_msgs.msg import Int32 # Messages used in the node must be imported.
 from geometry_msgs.msg import Pose
 
-
-import sys
 import cv2
 import numpy as np
 
-
 rospy.init_node("track_blob")
-
-
 
 pub = rospy.Publisher('follow_blob', Pose, queue_size=10)
 
 target_pose=Pose() # declaring a message variable of type Int32
 
-
 CM_TO_PIXEL = 60 / 640
-
-# def openCamera():
-# 	cap=cv2.VideoCapture(0)
-# 	return cap
 
 def remapValue(OldMax,OldMin,NewMax,NewMin,OldValue):
     OldRange = (OldMax - OldMin)  
     NewRange = (NewMax - NewMin)  
     NewValue = (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
     return NewValue
-
-
 
 def main():
 	x2_remap=0.0
@@ -61,14 +45,12 @@ def main():
 		blue=cv2.inRange(hsv,blue_lower,blue_upper)
 		
 		#Morphological transformation, Dilation  	
-		# kernal = np.ones((5 ,5), "uint8")
+		kernal = np.ones((5 ,5), "uint8")
 
+		blue=cv2.dilate(blue,kernal)
 
-		# blue=cv2.dilate(blue,kernal)
+		img=cv2.circle(img,(260,68),5,(255,0,0),-1)
 
-		# img=cv2.circle(img,(260,68),5,(255,0,0),-1)
-
-				
 		#Tracking the Blue Color
 		contours,hierarchy=cv2.findContours(blue,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
@@ -88,14 +70,6 @@ def main():
 				# instead of pixel coordinates
 				x2_cm = x2 * CM_TO_PIXEL
 				y2_cm = y2 * CM_TO_PIXEL
-				# x2_remap = remapValue(0,60,-0.35,0.35,x2_cm)
-				# y2_remap = remapValue(0,44,0.3,0.4,y2_cm)
-				# # x2_remap = remapValue(0,32,0.35,0.25,x2_cm)
-				# # y2_remap = remapValue(0,23.8,11.9,-11.9,y2_cm)
-				# x2_cm = round(x2_cm,7)
-				# y2_cm=round(y2_cm,7)
-				# x2_remap=round(x2_remap,7)
-				# y2_remap=round(y2_remap,7)
 
 				s = "x: " + str(x2_cm) + ", y: " + str(y2_cm)
 				top = y - 15 if y - 15 > 15 else y + 15
@@ -108,9 +82,7 @@ def main():
 					pub.publish(target_pose)
 					x_d_p=x2_cm
 					y_d_p=y2_cm
-				
-			
-		
+					
 		cv2.imshow("Mask",blue)
 		cv2.imshow("Color Tracking",img)
 		if cv2.waitKey(1)== ord('q'):
